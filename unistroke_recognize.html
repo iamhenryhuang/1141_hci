@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$1 Unistroke Recognizer - Palm Pilot Graffiti 測試</title>
+    <style>
+        /* 全局重置與深色主題 */
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        :root {
+          --primary: #8a2be2;
+          --primary-light: #a45deb;
+          --secondary: #00c896;
+          --dark: #121826;
+          --darker: #0a0e17;
+          --light: #f0f2f5;
+          --gray: #6c757d;
+          --success: #00c896;
+          --warning: #ffb800;
+          --danger: #ff6b6b;
+        }
+
+        body {
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          line-height: 1.6;
+          background: linear-gradient(135deg, var(--darker), var(--dark));
+          color: var(--light);
+          min-height: 100vh;
+          padding: 20px;
+        }
+
+        /* 玻璃態卡片設計 */
+        .card {
+          background: rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+          overflow: hidden;
+        }
+
+        /* 主容器 */
+        .container {
+          max-width: 1400px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 1fr 2fr;
+          gap: 30px;
+          padding: 20px;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 25px;
+          padding: 30px;
+        }
+
+        /* 畫布區域 */
+        .canvas-area {
+          display: flex;
+          flex-direction: column;
+          gap: 25px;
+        }
+
+        /* 標題樣式 */
+        .title {
+          font-size: 2.5rem;
+          font-weight: 800;
+          background: linear-gradient(90deg, var(--primary), var(--secondary));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          margin-bottom: 10px;
+        }
+
+        .subtitle {
+          font-size: 1.2rem;
+          color: var(--gray);
+          margin-bottom: 30px;
+        }
+
+        /* 按鈕設計 */
+        .btn {
+          background: linear-gradient(90deg, var(--primary), var(--primary-light));
+          color: white;
+          border: none;
+          border-radius: 12px;
+          padding: 14px 24px;
+          font-size: 1.1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 5px 15px rgba(138, 43, 226, 0.3);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .btn:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(138, 43, 226, 0.4);
+        }
+
+        .btn:active {
+          transform: translateY(0);
+        }
+
+        .btn-secondary {
+          background: rgba(255, 255, 255, 0.15);
+          box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+          background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* 畫布設計 */
+        #canvas {
+          background: rgba(0, 0, 0, 0.25);
+          border-radius: 16px;
+          box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+          border: 2px solid rgba(255, 255, 255, 0.1);
+          cursor: crosshair;
+          transition: box-shadow 0.3s ease;
+        }
+
+        #canvas:active {
+          box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7);
+        }
+
+        /* 結果顯示區 */
+        #result {
+          padding: 25px;
+          border-radius: 16px;
+          transition: all 0.5s ease;
+        }
+
+        .result-high {
+          background: linear-gradient(135deg, var(--success), #00a878);
+        }
+
+        .result-medium {
+          background: linear-gradient(135deg, var(--warning), #e09e00);
+        }
+
+        .result-low {
+          background: linear-gradient(135deg, var(--danger), #e05555);
+        }
+
+        /* 測試結果表格 */
+        #testResults {
+          width: 100%;
+          border-collapse: collapse;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          overflow: hidden;
+        }
+
+        #testResults th {
+          background: rgba(0, 0, 0, 0.3);
+          padding: 15px;
+          text-align: left;
+          font-weight: 600;
+        }
+
+        #testResults td {
+          padding: 12px 15px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        #testResults tr:hover {
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 992px) {
+          .container {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .control-panel, .canvas-area {
+            padding: 20px;
+          }
+          
+          .btn {
+            width: 100%;
+            margin-bottom: 10px;
+          }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel card">
+            <h1 class="title">$1 Unistroke Recognizer - Palm Pilot Graffiti</h1>
+            
+            <h2 class="subtitle">設定</h2>
+            <div>
+              <label for="nValue">N 值:</label>
+              <select id="nValue">
+                <option value="32">32 (快速)</option>
+                <option value="64" selected>64 (推薦)</option>
+                <option value="96">96 (高精度)</option>
+                <option value="128">128 (最高精度)</option>
+              </select>
+            </div>
+            
+            <h2 class="subtitle">操作</h2>
+            <button class="btn" onclick="recognize()">識別手勢</button>
+            <button class="btn btn-secondary" onclick="clearCanvas()">清除畫布</button>
+            <button class="btn" onclick="createCustomTemplate()">創建自定義模板</button>
+            
+            <h2 class="subtitle">自動測試</h2>
+            <button class="btn" onclick="testN(32)">測試 N=32</button>
+            <button class="btn" onclick="testN(64)">測試 N=64</button>
+            <button class="btn" onclick="testN(96)">測試 N=96</button>
+            <button class="btn" onclick="testN(128)">測試 N=128</button>
+            <button class="btn" onclick="testAll()">測試所有 N 值</button>
+            
+            <h2 class="subtitle">手勢參考</h2>
+            <div id="reference"></div>
+        </div>
+        
+        <div class="canvas-area card">
+            <canvas id="canvas" width="500" height="500"></canvas>
+            
+            <div id="result">
+              <h3 class="title">識別結果</h3>
+              <p id="resultText">請繪製手勢...</p>
+            </div>
+            
+            <h2 class="subtitle">測試結果</h2>
+            <table id="testResults">
+              <thead>
+                <tr>
+                  <th>數字</th>
+                  <th>結果</th>
+                  <th>信心度</th>
+                  <th>時間(ms)</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 全局變量
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let points = [];
+        let currentRecognizer = null;
+        let currentN = 64;
+        let testResults = {};
+        let customTemplates = {}; // 自定義模板
+        let currentTemplateMode = 'reference'; // 'reference' 或 'create'
+        let creatingDigitIndex = 0; // 當前創建的數字索引
+        let usingCustomTemplates = false; // 是否使用自定義模板
+
+        // Point 類
+        function Point(x, y) {
+            this.X = x;
+            this.Y = y;
+        }
+
+        // Rectangle 類
+        function Rectangle(x, y, width, height) {
+            this.X = x;
+            this.Y = y;
+            this.Width = width;
+            this.Height = height;
+        }
+
+        // Unistroke 類
+        function Unistroke(name, points) {
+            this.Name = name;
+            this.Points = Resample(points, NumPoints);
+            var radians = IndicativeAngle(this.Points);
+            this.Points = RotateBy(this.Points, -radians);
+            this.Points = ScaleTo(this.Points, SquareSize);
+            this.Points = TranslateTo(this.Points, Origin);
+        }
+
+        // Result 類
+        function Result(name, score, ms) {
+            this.Name = name;
+            this.Score = score;
+            this.Time = ms;
+        }
+
+        // 常量 - 優化參數以提高準確率
+        let NumPoints = 64;
+        const SquareSize = 250.0;
+        const Origin = new Point(0,0);
+        const Diagonal = Math.sqrt(SquareSize * SquareSize + SquareSize * SquareSize);
+        const HalfDiagonal = 0.5 * Diagonal;
+        const AngleRange = Deg2Rad(60.0); // 增加角度範圍
+        const AnglePrecision = Deg2Rad(1.0); // 提高角度精度
+        const Phi = 0.5 * (-1.0 + Math.sqrt(5.0));
+
+        // DollarRecognizer 類
+        function DollarRecognizer() {
+            this.Unistrokes = [];
+
+            this.Recognize = function(points, useProtractor) {
+                var t0 = Date.now();
+                var candidate = new Unistroke("", points);
+
+                var u = -1;
+                var b = +Infinity;
+
+                // 優化：嘗試多種角度範圍以提高準確率
+                for (var i = 0; i < this.Unistrokes.length; i++) {
+                    // 首先嘗試標準角度範圍
+                    var d1 = DistanceAtBestAngle(candidate.Points, this.Unistrokes[i], -AngleRange, +AngleRange, AnglePrecision);
+
+                    // 如果結果不佳，嘗試更大的角度範圍
+                    var d2 = +Infinity;
+                    if (d1 > HalfDiagonal * 0.3) { // 如果相似度低於70%
+                        d2 = DistanceAtBestAngle(candidate.Points, this.Unistrokes[i], -Deg2Rad(90.0), +Deg2Rad(90.0), AnglePrecision);
+                    }
+
+                    // 取最好的結果
+                    var d = Math.min(d1, d2);
+
+                    if (d < b) {
+                        b = d;
+                        u = i;
+                    }
+                }
+                var t1 = Date.now();
+                return (u == -1) ? new Result("No match.", 0.0, t1-t0) : new Result(this.Unistrokes[u].Name, Math.max(0, 1.0 - b / HalfDiagonal), t1-t0);
+            }
+
+            this.AddGesture = function(name, points) {
+                this.Unistrokes[this.Unistrokes.length] = new Unistroke(name, points);
+                return this.Unistrokes.length;
+            }
+        }
+
+        // Palm Pilot Graffiti 數字模板 - 優化版本，使用更多樣本點提高準確率
+        const graffitiDigits = {
+            '0': generateCirclePoints(200, 150, 70, 32), // 逆時針圓圈
+            '1': [ // 垂直線，更多點
+                {X:200,Y:70},{X:200,Y:85},{X:200,Y:100},{X:200,Y:115},{X:200,Y:130},
+                {X:200,Y:145},{X:200,Y:160},{X:200,Y:175},{X:200,Y:190},{X:200,Y:205},
+                {X:200,Y:220},{X:200,Y:230}
+            ],
+            '2': [ // Z字形手勢
+                {X:120,Y:80},{X:140,Y:80},{X:160,Y:80},{X:180,Y:80},{X:200,Y:80},
+                {X:220,Y:80},{X:240,Y:80},{X:260,Y:80},{X:280,Y:80},{X:280,Y:100},
+                {X:280,Y:120},{X:280,Y:140},{X:260,Y:160},{X:240,Y:170},{X:220,Y:180},
+                {X:200,Y:190},{X:180,Y:200},{X:160,Y:210},{X:140,Y:220},{X:120,Y:230}
+            ],
+            '3': [ // 雙彎曲
+                {X:120,Y:80},{X:160,Y:80},{X:200,Y:80},{X:240,Y:80},{X:260,Y:80},
+                {X:270,Y:100},{X:260,Y:120},{X:240,Y:130},{X:220,Y:140},{X:200,Y:150},
+                {X:240,Y:160},{X:260,Y:170},{X:270,Y:190},{X:260,Y:210},{X:240,Y:220},
+                {X:200,Y:230},{X:160,Y:230},{X:120,Y:230}
+            ],
+            '4': [ // L形手勢
+                {X:120,Y:220},{X:120,Y:200},{X:120,Y:180},{X:120,Y:160},{X:120,Y:140},
+                {X:120,Y:120},{X:120,Y:100},{X:120,Y:80},{X:140,Y:80},{X:160,Y:80},
+                {X:180,Y:80},{X:200,Y:80},{X:220,Y:80},{X:240,Y:80},{X:260,Y:80},
+                {X:260,Y:100},{X:260,Y:120},{X:260,Y:140},{X:260,Y:160},{X:260,Y:180}
+            ],
+            '5': [ // 複雜的S形
+                {X:260,Y:80},{X:240,Y:80},{X:220,Y:80},{X:200,Y:80},{X:180,Y:80},
+                {X:160,Y:80},{X:140,Y:80},{X:140,Y:100},{X:140,Y:120},{X:160,Y:140},
+                {X:180,Y:150},{X:200,Y:160},{X:220,Y:170},{X:240,Y:180},{X:260,Y:190},
+                {X:260,Y:210},{X:240,Y:220},{X:220,Y:230},{X:200,Y:230},{X:180,Y:230},
+                {X:160,Y:230},{X:140,Y:230}
+            ],
+            '6': [ // 帶尾巴的圓形
+                {X:220,Y:80},{X:200,Y:80},{X:180,Y:80},{X:160,Y:90},{X:150,Y:110},
+                {X:150,Y:130},{X:150,Y:150},{X:160,Y:170},{X:180,Y:190},{X:200,Y:200},
+                {X:220,Y:210},{X:240,Y:220},{X:240,Y:200},{X:240,Y:180},{X:220,Y:160},
+                {X:200,Y:150},{X:180,Y:140},{X:160,Y:140},{X:140,Y:140}
+            ],
+            '7': [ // 斜線
+                {X:140,Y:80},{X:150,Y:90},{X:160,Y:100},{X:170,Y:110},{X:180,Y:120},
+                {X:190,Y:130},{X:200,Y:140},{X:210,Y:150},{X:220,Y:160},{X:230,Y:170},
+                {X:240,Y:180},{X:250,Y:190},{X:260,Y:200},{X:260,Y:210},{X:260,Y:220},{X:260,Y:230}
+            ],
+            '8': [ // 雙圓形
+                {X:200,Y:80},{X:220,Y:85},{X:235,Y:95},{X:240,Y:110},{X:235,Y:125},
+                {X:220,Y:135},{X:200,Y:140},{X:180,Y:135},{X:165,Y:125},{X:160,Y:110},
+                {X:165,Y:95},{X:180,Y:85},{X:200,Y:80},{X:200,Y:120},{X:220,Y:125},
+                {X:235,Y:135},{X:240,Y:150},{X:235,Y:165},{X:220,Y:175},{X:200,Y:180},
+                {X:180,Y:175},{X:165,Y:165},{X:160,Y:150},{X:165,Y:135},{X:180,Y:125},{X:200,Y:120}
+            ],
+            '9': [ // 帶尾巴的圓形（向上）
+                {X:180,Y:230},{X:200,Y:230},{X:220,Y:230},{X:240,Y:220},{X:250,Y:200},
+                {X:250,Y:180},{X:250,Y:160},{X:240,Y:140},{X:220,Y:120},{X:200,Y:110},
+                {X:180,Y:100},{X:160,Y:90},{X:160,Y:110},{X:160,Y:130},{X:180,Y:150},
+                {X:200,Y:160},{X:220,Y:170},{X:240,Y:180},{X:260,Y:180}
+            ]
+        };
+
+        // 生成圓形點的輔助函數
+        function generateCirclePoints(cx, cy, radius, numPoints) {
+            const pts = [];
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (2 * Math.PI * i) / numPoints;
+                pts.push({ X: cx + radius * Math.cos(angle), Y: cy + radius * Math.sin(angle) });
+            }
+            return pts;
+        }
+
+        // 初始化
+        function init() {
+            setupCanvas();
+            updateRecognizer();
+            showTemplateMode('reference');
+        }
+
+        // 顯示手勢參考
+        function displayGestureReference() {
+            const container = document.getElementById('gestureReference');
+            container.innerHTML = '';
+
+            for (let digit in graffitiDigits) {
+                const div = document.createElement('div');
+                div.style.cssText = `
+                    border: 2px solid #3498db;
+                    border-radius: 8px;
+                    padding: 10px;
+                    text-align: center;
+                    background-color: white;
+                `;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 80;
+                canvas.height = 80;
+                canvas.style.border = '1px solid #ddd';
+                canvas.style.borderRadius = '4px';
+
+                // 繪製手勢
+                drawGestureOnCanvas(canvas, graffitiDigits[digit]);
+
+                const label = document.createElement('div');
+                label.textContent = digit;
+                label.style.cssText = `
+                    font-weight: bold;
+                    margin-top: 5px;
+                    color: #2c3e50;
+                    font-size: 18px;
+                `;
+
+                div.appendChild(canvas);
+                div.appendChild(label);
+                container.appendChild(div);
+            }
+        }
+
+        // 在小畫布上繪製手勢
+        function drawGestureOnCanvas(canvas, points) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (points.length < 2) return;
+
+            // 計算縮放和偏移
+            let minX = Math.min(...points.map(p => p.X));
+            let maxX = Math.max(...points.map(p => p.X));
+            let minY = Math.min(...points.map(p => p.Y));
+            let maxY = Math.max(...points.map(p => p.Y));
+
+            let scale = Math.min((canvas.width - 10) / (maxX - minX), (canvas.height - 10) / (maxY - minY));
+            let offsetX = (canvas.width - (maxX - minX) * scale) / 2 - minX * scale;
+            let offsetY = (canvas.height - (maxY - minY) * scale) / 2 - minY * scale;
+
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            for (let i = 0; i < points.length; i++) {
+                let x = points[i].X * scale + offsetX;
+                let y = points[i].Y * scale + offsetY;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+        }
+
+        // 設置畫布
+        function setupCanvas() {
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+        }
+
+        // 更新識別器
+        function updateRecognizer() {
+            currentRecognizer = new DollarRecognizer();
+
+            // 添加 Graffiti 數字模板
+            for (let digit in graffitiDigits) {
+                currentRecognizer.AddGesture(digit, graffitiDigits[digit]);
+            }
+        }
+
+        // 改變樣本數
+        function changeNumPoints(n) {
+            NumPoints = n;
+            currentN = n;
+            updateRecognizer();
+            document.getElementById('currentN').textContent = ` (目前 N = ${n})`;
+        }
+
+        // 開始繪製
+        function startDrawing(e) {
+            isDrawing = true;
+            points = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let rect = canvas.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            let y = e.clientY - rect.top;
+
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            points.push({X: x, Y: y});
+        }
+
+        // 繪製
+        function draw(e) {
+            if (!isDrawing) return;
+
+            let rect = canvas.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            let y = e.clientY - rect.top;
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            points.push({X: x, Y: y});
+        }
+
+        // 停止繪製
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // 清除畫布
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            points = [];
+            
+            // 清除結果區域的狀態樣式
+            let resultDiv = document.getElementById('result');
+            resultDiv.className = '';
+            resultDiv.innerHTML = '畫布已清除';
+        }
+
+        // 識別手勢
+        function recognizeGesture() {
+            if (points.length < 3) {
+                document.getElementById('result').innerHTML = '請先繪製一個手勢';
+                return;
+            }
+
+            let result = currentRecognizer.Recognize(points);
+            let confidence = (result.Score * 100).toFixed(1);
+
+            let resultText = `<strong>識別結果: ${result.Name}</strong><br>`;
+            resultText += `信心度: ${confidence}%<br>`;
+            resultText += `處理時間: ${result.Time}ms`;
+
+            // 根據信心度添加狀態文本和樣式
+            let resultDiv = document.getElementById('result');
+            resultDiv.className = ''; // 清除之前的狀態類別
+            
+            if (result.Score > 0.8) {
+                resultText += '<br><span style="color: white;">✓ 高信心度匹配</span>';
+                resultDiv.classList.add('result-high');
+            } else if (result.Score > 0.6) {
+                resultText += '<br><span style="color: white;">⚠ 中等信心度</span>';
+                resultDiv.classList.add('result-medium');
+            } else {
+                resultText += '<br><span style="color: white;">✗ 低信心度</span>';
+                resultDiv.classList.add('result-low');
+            }
+
+            resultDiv.innerHTML = resultText;
+        }
+
+        // 測試特定 N 值
+        function testWithN(n) {
+            changeNumPoints(n);
+            testAllDigits(n);
+        }
+
+        // 測試所有 N 值
+        function testAllN() {
+            testResults = {};
+            let allN = [32, 64, 96, 128];
+
+            allN.forEach(n => {
+                testAllDigits(n);
+            });
+
+            displayComparisonResults();
+        }
+
+        // 測試所有數字
+        function testAllDigits(n) {
+            if (n) changeNumPoints(n);
+
+            let results = [];
+            let correctCount = 0;
+            let totalTime = 0;
+
+            for (let digit in graffitiDigits) {
+                let result = currentRecognizer.Recognize(graffitiDigits[digit]);
+                let isCorrect = result.Name === digit;
+
+                if (isCorrect) correctCount++;
+                totalTime += result.Time;
+
+                results.push({
+                    digit: digit,
+                    recognized: result.Name,
+                    confidence: result.Score,
+                    correct: isCorrect,
+                    time: result.Time
+                });
+            }
+
+            testResults[currentN] = {
+                results: results,
+                accuracy: (correctCount / 10 * 100).toFixed(1),
+                correctCount: correctCount,
+                avgTime: (totalTime / 10).toFixed(1)
+            };
+
+            displayTestResults(currentN);
+        }
+
+        // 顯示測試結果
+        function displayTestResults(n) {
+            if (!testResults[n]) return;
+
+            let data = testResults[n];
+            let resultDiv = document.getElementById('testResults');
+
+            let html = `<h4>N = ${n} 測試結果</h4>`;
+            html += `<p><strong>準確率: ${data.accuracy}%</strong> (${data.correctCount}/10 正確)</p>`;
+            html += `<p>平均處理時間: ${data.avgTime}ms</p>`;
+
+            html += '<table class="accuracy-table">';
+            html += '<thead><tr><th>數字</th><th>識別結果</th><th>信心度</th><th>狀態</th></tr></thead><tbody>';
+
+            data.results.forEach(result => {
+                let statusText = result.correct ? '✓ 正確' : '✗ 錯誤';
+                let statusColor = result.correct ? 'green' : 'red';
+                html += `<tr>
+                    <td>${result.digit}</td>
+                    <td>${result.recognized}</td>
+                    <td>${(result.confidence * 100).toFixed(1)}%</td>
+                    <td style="color: ${statusColor};">${statusText}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            resultDiv.innerHTML = html;
+        }
+
+        // 顯示比較結果
+        function displayComparisonResults() {
+            let resultDiv = document.getElementById('testResults');
+            let html = '<h4>多個 N 值比較</h4>';
+
+            html += '<table class="accuracy-table">';
+            html += '<thead><tr><th>N 值</th><th>準確率</th><th>正確數</th><th>平均時間 (ms)</th></tr></thead><tbody>';
+
+            Object.keys(testResults).sort((a, b) => parseInt(a) - parseInt(b)).forEach(n => {
+                let data = testResults[n];
+                html += `<tr>
+                    <td>${n}</td>
+                    <td>${data.accuracy}%</td>
+                    <td>${data.correctCount}/10</td>
+                    <td>${data.avgTime}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            resultDiv.innerHTML = html;
+        }
+
+        // 工具函數 - 優化重取樣以提高準確率
+        function Resample(points, n) {
+            if (points.length < 2) return points;
+
+            var I = PathLength(points) / (n - 1);
+            var D = 0.0;
+            var newpoints = new Array(points[0]);
+            for (var i = 1; i < points.length; i++) {
+                var d = Distance(points[i-1], points[i]);
+                if ((D + d) >= I) {
+                    var qx = points[i-1].X + ((I - D) / d) * (points[i].X - points[i-1].X);
+                    var qy = points[i-1].Y + ((I - D) / d) * (points[i].Y - points[i-1].Y);
+                    var q = new Point(qx, qy);
+                    newpoints[newpoints.length] = q;
+                    points.splice(i, 0, q);
+                    D = 0.0;
+                } else D += d;
+            }
+
+            // 確保至少有n個點，如果不足則補充最後一點
+            while (newpoints.length < n) {
+                newpoints[newpoints.length] = new Point(points[points.length - 1].X, points[points.length - 1].Y);
+            }
+
+            // 如果超過n個點，截斷到n個點
+            if (newpoints.length > n) {
+                newpoints = newpoints.slice(0, n);
+            }
+
+            return newpoints;
+        }
+
+        function IndicativeAngle(points) {
+            var c = Centroid(points);
+            return Math.atan2(c.Y - points[0].Y, c.X - points[0].X);
+        }
+
+        function RotateBy(points, radians) {
+            var c = Centroid(points);
+            var cos = Math.cos(radians);
+            var sin = Math.sin(radians);
+            var newpoints = new Array();
+            for (var i = 0; i < points.length; i++) {
+                var qx = (points[i].X - c.X) * cos - (points[i].Y - c.Y) * sin + c.X;
+                var qy = (points[i].X - c.X) * sin + (points[i].Y - c.Y) * cos + c.Y;
+                newpoints[newpoints.length] = new Point(qx, qy);
+            }
+            return newpoints;
+        }
+
+        function ScaleTo(points, size) {
+            var B = BoundingBox(points);
+            var newpoints = new Array();
+            for (var i = 0; i < points.length; i++) {
+                var qx = points[i].X * (size / B.Width);
+                var qy = points[i].Y * (size / B.Height);
+                newpoints[newpoints.length] = new Point(qx, qy);
+            }
+            return newpoints;
+        }
+
+        function TranslateTo(points, pt) {
+            var c = Centroid(points);
+            var newpoints = new Array();
+            for (var i = 0; i < points.length; i++) {
+                var qx = points[i].X + pt.X - c.X;
+                var qy = points[i].Y + pt.Y - c.Y;
+                newpoints[newpoints.length] = new Point(qx, qy);
+            }
+            return newpoints;
+        }
+
+        function DistanceAtBestAngle(points, T, a, b, threshold) {
+            var x1 = Phi * a + (1.0 - Phi) * b;
+            var f1 = DistanceAtAngle(points, T, x1);
+            var x2 = (1.0 - Phi) * a + Phi * b;
+            var f2 = DistanceAtAngle(points, T, x2);
+            while (Math.abs(b - a) > threshold) {
+                if (f1 < f2) {
+                    b = x2;
+                    x2 = x1;
+                    f2 = f1;
+                    x1 = Phi * a + (1.0 - Phi) * b;
+                    f1 = DistanceAtAngle(points, T, x1);
+                } else {
+                    a = x1;
+                    x1 = x2;
+                    f1 = f2;
+                    x2 = (1.0 - Phi) * a + Phi * b;
+                    f2 = DistanceAtAngle(points, T, x2);
+                }
+            }
+            return Math.min(f1, f2);
+        }
+
+        function DistanceAtAngle(points, T, radians) {
+            var newpoints = RotateBy(points, radians);
+            return PathDistance(newpoints, T.Points);
+        }
+
+        function Centroid(points) {
+            var x = 0.0, y = 0.0;
+            for (var i = 0; i < points.length; i++) {
+                x += points[i].X;
+                y += points[i].Y;
+            }
+            x /= points.length;
+            y /= points.length;
+            return new Point(x, y);
+        }
+
+        function BoundingBox(points) {
+            var minX = +Infinity, maxX = -Infinity, minY = +Infinity, maxY = -Infinity;
+            for (var i = 0; i < points.length; i++) {
+                minX = Math.min(minX, points[i].X);
+                minY = Math.min(minY, points[i].Y);
+                maxX = Math.max(maxX, points[i].X);
+                maxY = Math.max(maxY, points[i].Y);
+            }
+            return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        function PathDistance(pts1, pts2) {
+            var d = 0.0;
+            for (var i = 0; i < pts1.length; i++)
+                d += Distance(pts1[i], pts2[i]);
+            return d / pts1.length;
+        }
+
+        function PathLength(points) {
+            var d = 0.0;
+            for (var i = 1; i < points.length; i++)
+                d += Distance(points[i - 1], points[i]);
+            return d;
+        }
+
+        function Distance(p1, p2) {
+            var dx = p2.X - p1.X;
+            var dy = p2.Y - p1.Y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function Deg2Rad(d) { return (d * Math.PI / 180.0); }
+
+        // 顯示模板模式
+        function showTemplateMode(mode) {
+            currentTemplateMode = mode;
+            const container = document.getElementById('templateContent');
+
+            if (mode === 'reference') {
+                showReferenceTemplates();
+            } else if (mode === 'create') {
+                showCreateTemplateInterface();
+            }
+
+            // 更新按鈕狀態
+            updateTemplateButtons();
+        }
+
+        // 顯示標準參考模板
+        function showReferenceTemplates() {
+            const container = document.getElementById('templateContent');
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0;">
+                    ${Array.from({length: 10}, (_, i) => {
+                        const digit = i.toString();
+                        return `
+                            <div style="border: 2px solid #3498db; border-radius: 8px; padding: 10px; text-align: center; background-color: white;">
+                                <canvas width="80" height="80" style="border: 1px solid #ddd; border-radius: 4px; margin: 5px auto; display: block;"></canvas>
+                                <div style="font-weight: bold; margin-top: 5px; color: #2c3e50; font-size: 18px;">${digit}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <p style="font-size: 14px; color: #666; text-align: center; margin-top: 10px;">
+                    參考上方的標準手勢來繪製您的輸入，以獲得更好的識別準確率
+                </p>
+            `;
+
+            // 繪製標準模板
+            setTimeout(() => {
+                const canvases = container.querySelectorAll('canvas');
+                canvases.forEach((canvas, index) => {
+                    const digit = index.toString();
+                    drawGestureOnCanvas(canvas, graffitiDigits[digit]);
+                });
+            }, 100);
+        }
+
+        // 顯示創建自定義模板界面
+        function showCreateTemplateInterface() {
+            const container = document.getElementById('templateContent');
+            container.innerHTML = `
+                <div style="text-align: center; margin: 20px 0;">
+                    <h4>創建您的自定義數字模板</h4>
+                    <p>請按照順序繪製數字 0 到 9。每個數字可以重複繪製多次來改善準確率。</p>
+                    <div style="font-size: 24px; font-weight: bold; margin: 20px; color: #e74c3c;">
+                        請繪製數字: <span id="currentDigitDisplay">0</span>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <button onclick="clearCanvas()" style="margin: 0 10px;">清除畫布</button>
+                        <button onclick="saveCurrentDigit()" style="margin: 0 10px;">保存這個 ${creatingDigitIndex}</button>
+                        <button onclick="nextDigit()" style="margin: 0 10px;">下一個數字</button>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <button onclick="finishCustomTemplates()" style="background-color: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 5px;">完成並使用自定義模板</button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0;">
+                    ${Array.from({length: 10}, (_, i) => {
+                        const digit = i.toString();
+                        const hasTemplate = customTemplates[digit] && customTemplates[digit].length > 0;
+                        return `
+                            <div style="border: 2px solid ${hasTemplate ? '#27ae60' : '#ddd'}; border-radius: 8px; padding: 8px; text-align: center; background-color: ${hasTemplate ? '#f8fff8' : 'white'};">
+                                <canvas width="60" height="60" style="border: 1px solid #ccc; border-radius: 3px; margin: 3px auto; display: block;"></canvas>
+                                <div style="font-weight: bold; margin-top: 3px; color: #2c3e50; font-size: 14px;">${digit}</div>
+                                <div style="font-size: 12px; color: ${hasTemplate ? '#27ae60' : '#999'};">
+                                    ${hasTemplate ? `${customTemplates[digit].length} 個樣本` : '未創建'}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+
+            // 繪製現有的自定義模板
+            setTimeout(() => {
+                const canvases = container.querySelectorAll('canvas');
+                canvases.forEach((canvas, index) => {
+                    const digit = index.toString();
+                    if (customTemplates[digit] && customTemplates[digit].length > 0) {
+                        // 顯示最新的模板
+                        drawGestureOnCanvas(canvas, customTemplates[digit][customTemplates[digit].length - 1]);
+                    }
+                });
+            }, 100);
+        }
+
+        // 保存當前繪製的數字
+        function saveCurrentDigit() {
+            if (points.length < 3) {
+                alert('請先繪製一個數字');
+                return;
+            }
+
+            const digit = creatingDigitIndex.toString();
+
+            if (!customTemplates[digit]) {
+                customTemplates[digit] = [];
+            }
+
+            // 保存當前的點陣列
+            customTemplates[digit].push([...points]);
+
+            // 重新顯示界面
+            showCreateTemplateInterface();
+
+            alert(`數字 ${digit} 已保存！您現在有 ${customTemplates[digit].length} 個樣本。`);
+        }
+
+        // 下一個數字
+        function nextDigit() {
+            if (creatingDigitIndex < 9) {
+                creatingDigitIndex++;
+            } else {
+                creatingDigitIndex = 0;
+            }
+            document.getElementById('currentDigitDisplay').textContent = creatingDigitIndex;
+            clearCanvas();
+        }
+
+        // 完成自定義模板創建
+        function finishCustomTemplates() {
+            const totalSamples = Object.values(customTemplates).reduce((sum, samples) => sum + samples.length, 0);
+
+            if (totalSamples === 0) {
+                alert('請至少創建一個數字樣本');
+                return;
+            }
+
+            alert(`自定義模板創建完成！總共 ${totalSamples} 個樣本。`);
+
+            // 切換到使用自定義模板
+            switchToCustomTemplates();
+        }
+
+        // 切換到使用自定義模板
+        function switchToCustomTemplates() {
+            usingCustomTemplates = true;
+            updateRecognizer();
+            document.getElementById('useCustomBtn').style.display = 'inline-block';
+            document.getElementById('result').innerHTML = '<span style="color: #27ae60; font-weight: bold;">✓ 現在使用您的自定義模板進行識別</span>';
+        }
+
+        // 切換回標準模板
+        function switchToStandardTemplates() {
+            usingCustomTemplates = false;
+            updateRecognizer();
+            document.getElementById('useCustomBtn').style.display = 'none';
+            document.getElementById('result').innerHTML = '<span style="color: #3498db; font-weight: bold;">✓ 現在使用標準 Palm Pilot Graffiti 模板</span>';
+        }
+
+        // 更新識別器（支持自定義模板）
+        function updateRecognizer() {
+            currentRecognizer = new DollarRecognizer();
+
+            if (usingCustomTemplates) {
+                // 添加自定義模板
+                for (let digit in customTemplates) {
+                    if (customTemplates[digit] && customTemplates[digit].length > 0) {
+                        // 如果有多個樣本，平均它們或者都添加
+                        customTemplates[digit].forEach(sample => {
+                            currentRecognizer.AddGesture(digit, sample);
+                        });
+                    }
+                }
+            } else {
+                // 添加標準 Graffiti 數字模板
+                for (let digit in graffitiDigits) {
+                    currentRecognizer.AddGesture(digit, graffitiDigits[digit]);
+                }
+            }
+        }
+
+        // 更新模板按鈕狀態
+        function updateTemplateButtons() {
+            const showReferenceBtn = document.getElementById('showReferenceBtn');
+            const createTemplateBtn = document.getElementById('createTemplateBtn');
+
+            if (currentTemplateMode === 'reference') {
+                showReferenceBtn.style.backgroundColor = '#2980b9';
+                createTemplateBtn.style.backgroundColor = '#3498db';
+            } else {
+                showReferenceBtn.style.backgroundColor = '#3498db';
+                createTemplateBtn.style.backgroundColor = '#2980b9';
+            }
+        }
+
+        // 頁面加載完成後初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
